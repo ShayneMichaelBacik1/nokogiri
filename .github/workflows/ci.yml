@@ -321,3 +321,40 @@ jobs:
       - run: bundle install --local || bundle install
       - run: bundle exec rake compile -- --${{matrix.sys}}-system-libraries
       - run: bundle exec rake test:memcheck
+
+  downstream:
+    name: downstream-${{matrix.name}}
+    needs: ["basic"]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - url: https://github.com/flavorjones/loofah
+            name: loofah
+          - url: https://github.com/rails/rails-html-sanitizer
+            name: rails-html-sanitizer
+          - url: https://github.com/rgrove/sanitize
+            name: sanitize
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/sparklemotion/nokogiri-test:mri-3.1
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - uses: actions/cache@v2
+        with:
+          path: ports
+          key: ports-ubuntu-${{hashFiles('dependencies.yml', 'patches/**/*.patch')}}
+      - run: bundle install --local || bundle install
+      - run: bundle exec rake compile
+      - run: |
+          git clone --depth=1 ${{matrix.url}} ${{matrix.name}}
+          cd ${{matrix.name}}
+          cat <<EOF > Gemfile
+          source 'https://rubygems.org'
+          gemspec
+          gem 'nokogiri', path: '..'
+          EOF
+          bundle install --local || bundle install
+          bundle exec rake test
