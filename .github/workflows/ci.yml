@@ -331,10 +331,19 @@ jobs:
         include:
           - url: https://github.com/flavorjones/loofah
             name: loofah
+            command: "rake test"
           - url: https://github.com/rails/rails-html-sanitizer
             name: rails-html-sanitizer
+            command: "rake test"
           - url: https://github.com/rgrove/sanitize
             name: sanitize
+            command: "rake test"
+          - url: https://github.com/ebeigarts/signer
+            name: signer
+            command: "rake spec"
+          - url: https://github.com/WinRb/Viewpoint
+            name: Viewpoint
+            command: "rspec spec"
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/sparklemotion/nokogiri-test:mri-3.1
@@ -357,4 +366,29 @@ jobs:
           gem 'nokogiri', path: '..'
           EOF
           bundle install --local || bundle install
-          bundle exec rake test
+          bundle exec ${{matrix.command}}
+
+  downstream-xmlmini:
+    needs: ["basic"]
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/sparklemotion/nokogiri-test:mri-3.1
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - uses: actions/cache@v2
+        with:
+          path: ports
+          key: ports-ubuntu-${{hashFiles('dependencies.yml', 'patches/**/*.patch')}}
+      - run: bundle install --local || bundle install
+      - run: bundle exec rake compile
+      - run: |
+          git clone --depth=1 https://github.com/rails/rails rails
+          cd rails
+          cp Gemfile Gemfile.bak
+          cat Gemfile.bak | fgrep -v nokogiri > Gemfile
+          echo "gem 'nokogiri', path: '..'" >> Gemfile
+          bundle install --local || bundle install
+          cd activesupport
+          bundle exec rake test TESTOPTS=-n/XmlMini/
